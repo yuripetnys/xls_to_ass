@@ -85,7 +85,7 @@ def load_xls_dialog_on_result(e: ft.FilePickerResultEvent, load_xls_btn: ft.Butt
 
     load_xls_btn.text = fn
     dd.options = [ft.DropdownOption(s, s) for s in list(wb.keys())]
-    dd.value = wb[list(wb.keys())[0]]
+    dd.value = list(wb.keys())[0]
     dd.disabled = False
     load_dd_btn.disabled = False
     page.data = wb

@@ -74,6 +74,8 @@ def convert_datetime(s: str, is_timecode: bool = True, framerate: float = 24.0, 
     if scale:
         td = td * scale
 
+    
+
     return td
 
 def create_style(name: str = "Default", is_type: bool = False) -> ass.Style:
@@ -153,22 +155,3 @@ def convert_worksheet_to_ass(ws: list[list[str]], doc: ass.Document = None, star
         doc.events.append(event)
 
     return doc
-
-if __name__ == "__main__":
-    input_fn = "test.xlsx"
-    output_fn = "test_xlsx.ass"
-
-    wb = load_excel_file(input_fn)    
-    ws = wb[list(wb.keys())[0]]
-    doc = convert_worksheet_to_ass(ws, start_col=0, end_col=1, actor_col=2, dialogue_col=3, has_headers=True)
-    with open(output_fn, "w", encoding="utf_8_sig") as f:
-        doc.dump_file(f)
-
-    input_fn = "test.xls"
-    output_fn = "test_xls.ass"
-
-    wb = load_excel_file(input_fn)    
-    ws = wb[list(wb.keys())[0]]
-    doc = convert_worksheet_to_ass(ws, track_col=1, start_col=2, end_col=3, dialogue_col=6, has_headers=True)
-    with open(output_fn, "w", encoding="utf_8_sig") as f:
-        doc.dump_file(f)
