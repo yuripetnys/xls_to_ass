@@ -1,8 +1,6 @@
 from datetime import timedelta
 import flet as ft
-from openpyxl import load_workbook
-from openpyxl.worksheet.worksheet import Worksheet
-from xls_to_ass import convert_datetime, convert_worksheet_to_ass
+from xls_to_ass import convert_datetime, convert_worksheet_to_ass, load_excel_file
 
 STYLES = {
     "title": ft.TextStyle(size=30, weight=ft.FontWeight.BOLD),
@@ -16,16 +14,16 @@ def generate_placeholder_datatable() -> ft.DataTable:
     cols = [ft.DataColumn(ft.Text("     ")) for i in range(DT_PLACEHOLDER_COLS)]
     return ft.DataTable(columns=cols, rows=rows, data_row_min_height=0, expand=True)
 
-def format_ws_to_datatable(ws: Worksheet, has_headers: bool = True) -> tuple[ft.DataTable, list[tuple[int, str]]]:
+def format_ws_to_datatable(ws: list[list[str]], has_headers: bool = True) -> tuple[ft.DataTable, list[tuple[int, str]]]:
     i = 0
     rows = []
     cols = []
     dd_options = []
 
-    for r in ws.rows:
+    for r in ws:
         if not cols:
             if has_headers:
-                col_names = [c.value for c in r]
+                col_names = r
                 for j in range(len(col_names)):
                     if not col_names[j]:
                         col_names[j] = f"Column {j+1}"                
@@ -39,7 +37,7 @@ def format_ws_to_datatable(ws: Worksheet, has_headers: bool = True) -> tuple[ft.
         if i == DT_MAX_DISPLAY_ROWS:
             break
         rows.append(ft.DataRow([ft.DataCell(
-            ft.Text(c.value, size=12)
+            ft.Text(c, size=12)
             ) for c in r]))
         i = i + 1
     
@@ -76,8 +74,9 @@ def load_xls_dialog_on_result(e: ft.FilePickerResultEvent, load_xls_btn: ft.Butt
 
     fn = e.files[0].name
     try:
-        wb = load_workbook(fn)
-    except:
+        wb = load_excel_file(fn)
+    except Exception as e:
+        print(e)
         dd.value = ""
         dd.disabled = True
         load_dd_btn.disabled = True
@@ -85,8 +84,8 @@ def load_xls_dialog_on_result(e: ft.FilePickerResultEvent, load_xls_btn: ft.Butt
         return
 
     load_xls_btn.text = fn
-    dd.options = [ft.DropdownOption(s, s) for s in wb.sheetnames]
-    dd.value = wb.sheetnames[0]
+    dd.options = [ft.DropdownOption(s, s) for s in list(wb.keys())]
+    dd.value = wb[list(wb.keys())[0]]
     dd.disabled = False
     load_dd_btn.disabled = False
     page.data = wb
@@ -241,6 +240,5 @@ def main(page: ft.Page):
     page.overlay.append(save_ass_fp)
     page.update()
 
-
 if __name__ == "__main__":
-    ft.app(main)
+    ft.app(target=main)

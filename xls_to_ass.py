@@ -1,14 +1,61 @@
 from typing import Any
 import ass, re 
 from datetime import timedelta
-from openpyxl import load_workbook
-from openpyxl.worksheet.worksheet import Worksheet
+import openpyxl
+import xlrd
+
+DEBUG = False
+
+def __fmt(s) -> str:
+    if s is None:
+        return ""    
+    elif type(s) == str:
+        return s.strip()
+    elif type(s) == int:
+        return str(s)
+    elif type(s) == float:
+        return str(s)
+    else:
+        return str(s)
+
+def __load_file_openpyxl(fn: str) -> dict[str, list[list[str]]]:
+    book = openpyxl.load_workbook(fn)
+    return dict({ws: list([list([__fmt(c) for c in row]) for row in book[ws].iter_rows(values_only=True)]) for ws in book.sheetnames})
+
+def __load_file_xlrd(fn: str) -> dict[str, list[list[str]]]:
+    book = xlrd.open_workbook(fn)
+    return dict({ws_name: list([list([__fmt(c.value) for c in row]) for row in book.sheet_by_name(ws_name).get_rows()]) for ws_name in book.sheet_names()})
+
+def load_excel_file(fn: str) -> dict[str, list[list[str]]]:
+    if DEBUG:
+        print("Loading file...")
+    try:
+        data = __load_file_openpyxl(fn) 
+        if DEBUG:
+            print("OpenPYXL loaded the file successfully!")
+        return data
+    except:
+        if DEBUG:
+            print("OpenPYXL refused. Trying xlrd...")
+    
+    try:
+        data = __load_file_xlrd(fn)
+        if DEBUG:
+            print("xlrd loaded the file successfully!")
+        return data
+    except:
+        raise Exception(f"No valid interpreter found for {fn}")
 
 DATETIME_REGEX = re.compile(r"(\d+):(\d\d):(\d\d)[:.](\d+)")
 def is_timestamp(s: str) -> bool:
     return re.match(DATETIME_REGEX, s) is not None
 
 def convert_datetime(s: str, is_timecode: bool = True, framerate: float = 24.0, shift: timedelta = None, scale: float = None):
+    is_negative = False
+    if s[0] == "-":
+        is_negative = True
+        s = s[1:]
+
     m = re.match(DATETIME_REGEX, s)
 
     if not m:
@@ -59,7 +106,7 @@ def find_style(doc: ass.Document, style_name: str) -> ass.Style | None:
             return s
     return None
 
-def convert_worksheet_to_ass(ws: Worksheet, doc: ass.Document = None, start_col: int = None, end_col: int = None, dialogue_col: int = None, 
+def convert_worksheet_to_ass(ws: list[list[str]], doc: ass.Document = None, start_col: int = None, end_col: int = None, dialogue_col: int = None, 
                             actor_col: int = None, track_col: int = None, italics_col: int = None, has_headers: bool = True,
                             convert_timestamp_args: dict[str, Any] = {}) -> ass.Document:
     if start_col is None and dialogue_col is None:
@@ -69,35 +116,35 @@ def convert_worksheet_to_ass(ws: Worksheet, doc: ass.Document = None, start_col:
         doc = create_document()
     
     skip_headers = has_headers
-    for row in ws.rows:
+    for row in ws:
         if skip_headers:
             skip_headers = False
             continue
         event = ass.Dialogue()
         if start_col:
-            event.start = convert_datetime(row[start_col].value, **convert_timestamp_args)
+            event.start = convert_datetime(row[start_col], **convert_timestamp_args)
         else:
             event.start = "0:00:00.00"
 
         if end_col:
-            event.end = convert_datetime(row[end_col].value, **convert_timestamp_args)
+            event.end = convert_datetime(row[end_col], **convert_timestamp_args)
         elif start_col:
             event.end = event.start
         else:
             event.end = "0:00:00.00"
         
         if dialogue_col:
-            event.text = row[dialogue_col].value.replace("\n", "\\N")
+            event.text = row[dialogue_col].replace("\n", "\\N")
 
         if italics_col:
-            if row[italics_col].value:
+            if row[italics_col]:
                 event.text = "{\\i1}" + event.text
 
         if actor_col:
-            event.name = row[actor_col].value
+            event.name = row[actor_col]
 
         if track_col:
-            track = row[track_col].value
+            track = row[track_col]
             if not find_style(doc, track):
                 doc.styles.append(create_style(track))
             event.style = track
@@ -108,30 +155,20 @@ def convert_worksheet_to_ass(ws: Worksheet, doc: ass.Document = None, start_col:
     return doc
 
 if __name__ == "__main__":
+    input_fn = "test.xlsx"
+    output_fn = "test_xlsx.ass"
 
-    input_fn = "TWE2_Final Trailer_CHNENG Subtitles with timecode.xlsx"
-    output_fn = "TWE2_Final Trailer_CHNENG Subtitles with timecode.ass"
-
-    wb = load_workbook(input_fn)
-    ws = wb[wb.sheetnames[0]]
-    doc = convert_worksheet_to_ass(ws, start_col=0, end_col=1, dialogue_col=2, has_headers=False)
+    wb = load_excel_file(input_fn)    
+    ws = wb[list(wb.keys())[0]]
+    doc = convert_worksheet_to_ass(ws, start_col=0, end_col=1, actor_col=2, dialogue_col=3, has_headers=True)
     with open(output_fn, "w", encoding="utf_8_sig") as f:
         doc.dump_file(f)
 
-    input_fn = "TWE2_Main Trailer_Spotting list_with timecode_CHN&ENG.xlsx"
-    output_fn = "TWE2_Main Trailer_Spotting list_with timecode_CHN&ENG.ass"
+    input_fn = "test.xls"
+    output_fn = "test_xls.ass"
 
-    wb = load_workbook(input_fn)
-    ws = wb[wb.sheetnames[0]]
-    doc = convert_worksheet_to_ass(ws, start_col=0, end_col=1, dialogue_col=2, has_headers=False)
-    with open(output_fn, "w", encoding="utf_8_sig") as f:
-        doc.dump_file(f)
-
-    input_fn = "TWE2_MOSS Trailer_Subtitle with Timecode_CHN&ENG.xlsx"
-    output_fn = "TWE2_MOSS Trailer_Subtitle with Timecode_CHN&ENG.ass"
-
-    wb = load_workbook(input_fn)
-    ws = wb[wb.sheetnames[0]]
-    doc = convert_worksheet_to_ass(ws, start_col=0, end_col=1, actor_col=2, dialogue_col=4)
+    wb = load_excel_file(input_fn)    
+    ws = wb[list(wb.keys())[0]]
+    doc = convert_worksheet_to_ass(ws, track_col=1, start_col=2, end_col=3, dialogue_col=6, has_headers=True)
     with open(output_fn, "w", encoding="utf_8_sig") as f:
         doc.dump_file(f)
